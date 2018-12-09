@@ -1,12 +1,14 @@
 ! Configuration File for keepalived
 global_defs {
     router_id {{ keepalived_global.router_id | default("DEVEL") }}
+    script_user {{ keepalived_global.script_user | default("keepalived_script") }}
+    enable_script_security
 }
 
-{% for name, sync_group in keepalived_vrrp_sync_groups.iteritems() %}
+{% for name, sync_group in keepalived_vrrp_sync_groups.items() %}
 vrrp_sync_group {{ name }} {
     group {
-{% for instance in sync_group.instances %}
+{% for instance in sync_group.instances|default(ansible_play_hosts) %}
       {{ instance }}
 {% endfor %}
     }
@@ -26,7 +28,7 @@ vrrp_sync_group {{ name }} {
 {% endfor %}
 
 {% if keepalived_vrrp_scripts is defined %}
-{% for name, details in keepalived_vrrp_scripts.iteritems() %}
+{% for name, details in keepalived_vrrp_scripts.items() %}
 vrrp_script {{ name }} {        # Requires keepalived-1.1.13
     script "{{ details.check_script }}"
     interval {{ details.interval | default(5) }}   # checking every "{{ details.interval | default(5) }}" seconds (default: 5 seconds)
@@ -37,12 +39,12 @@ vrrp_script {{ name }} {        # Requires keepalived-1.1.13
 {% endfor %}
 {% endif %}
 
-{% for name, instance in keepalived_vrrp_instances.iteritems() %}
+{% for name, instance in keepalived_vrrp_instances.items() %}
 vrrp_instance {{ name }} {
-    interface {{ instance.interface }}
+    interface {{ instance.interface | default(ansible_default_ipv4.interface) }}
     state {{ instance.state }}
     virtual_router_id {{ instance.virtual_router_id }}
-    priority {{ instance.priority }}
+    priority {{ instance.priority | default(range(50, 99)|random)  }}
 {% if instance.advert_int is defined %}
     advert_int {{ instance.advert_int }}
 {% endif %}
@@ -67,3 +69,24 @@ vrrp_instance {{ name }} {
 
 }
 {% endfor %}
+
+{% if keepalived_virtual_servers is defined %}
+{% for name, server in keepalived_virtual_servers.items() %}
+! Virtual Server: {{ name }}
+virtual_server {{ server.vip }} {{ server.vport }} {
+    delay_loop {{ server.delay | default(6) }}
+    lb_algo {{ server.lb_algo | default('rr') }}
+    lb_kind {{ server.lb_kind | default('NAT') }}
+    protocol {{ server.protocol | default('TCP') }}
+
+{% for backend in server.backends|default(ansible_play_hosts) %}
+    real_server {{ hostvars[backend]['ansible_facts']['default_ipv4']['address'] }} {{ server.tport }} {
+        TCP_CHECK {
+                connect_timeout 10
+        }
+    }
+{% endfor %}
+
+}
+{% endfor %}
+{% endif %}

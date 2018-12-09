@@ -8,10 +8,15 @@
 # Setup/install tasks.
 - include: setup-RedHat.yml
   when: ansible_os_family == 'RedHat'
+- include: setup-archlinux.yml
+  when: ansible_os_family == 'Archlinux'
 
 # Configure tasks.
 - name: Configure keepalived.
-  template: src=keepalived.conf.j2 dest=/etc/keepalived/keepalived.conf backup=yes
+  template: 
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    backup: yes
   notify:
     - restart keepalived
   tags: keepalived_configure

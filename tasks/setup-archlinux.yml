@@ -1,0 +1,12 @@
+---
+# tasks file for Arch Linux distribution
+
+- name: Install keepalived.
+  pacman: 
+    name: keepalived
+    state: present
+
+- name: Ensure keepalived is started and enabled on boot.
+  service: 
+    name: keepalived
+    enabled: yes
